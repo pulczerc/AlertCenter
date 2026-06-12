@@ -1,0 +1,1 @@
+Use solution-architect agent. Generate architecture alternatives and recommendation.
