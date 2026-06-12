@@ -1,9 +1,9 @@
 # Current Status — Handoff State
 
 > **Project:** AlertCenter (Feature Design & Build from a Vague Brief)
-> **Last updated:** 2026-06-12
+> **Last updated:** 2026-06-13
 > **Updated by:** AI-assisted session (Claude)
-> **Current branch:** `main` (clean, up to date with origin)
+> **Current branch:** `main` (clean, pushed to origin)
 
 ---
 
@@ -36,7 +36,7 @@
   - `docs/03-architecture-decision.md` — **ADR-001 (Accepted):** Hexagonal modular monolith + DB Outbox.
   - `docs/prompts/002-architecture.md` — 2-iteration prompt trail (incl. human steering, verbatim), marked Accepted.
   - `docs/decision-log.md` — D-003 (validated). `docs/validation-log.md` — V-002 logged.
-  - **Not yet committed** — pending approval.
+- **Committed:** `4350bb2` — `docs(architecture): adopt hexagonal monolith + DB outbox (ADR-001)`.
 
 ---
 
