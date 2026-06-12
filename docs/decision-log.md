@@ -4,6 +4,7 @@
 |---|------|------|----------|--------|
 | D-001 | 2026-06-12 | Product Analysis | Generated `01-requirements-analysis.md` from vague brief. 7 ambiguities (Q-1..Q-7) raised with recommended defaults. | ✅ Validated by human |
 | D-002 | 2026-06-12 | Product Analysis | Human confirmed all 7 recommended defaults (Q-1..Q-7) below. These are now binding inputs to the Architecture step. | ✅ Validated by human |
+| D-003 | 2026-06-13 | Architecture | Human rejected the timebox-first Option A and directed a **Hexagonal (Ports & Adapters) modular monolith + DB Outbox** (Q-9). Ratified sub-decisions: **Q-8** stack = .NET 8 (Web API + EF Core/Npgsql); **Q-10** admin UI = SPA + JSON API; **Q-11** datastore = PostgreSQL. ADR-001 *Accepted*. | ✅ Validated by human |
 
 ## Open items requiring human decision
 

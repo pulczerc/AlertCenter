@@ -12,12 +12,12 @@
 | # | Step | Status |
 |---|------|--------|
 | 1 | Product Analysis | ✅ **Complete & validated** |
-| 2 | Architecture Alternatives | ⬜ **NEXT** |
-| 3 | Human Decision | ⬜ Pending |
-| 4 | API Design | ⬜ Pending |
+| 2 | Architecture Alternatives | ✅ **Complete & validated** |
+| 3 | Human Decision | ✅ **Complete** (ADR-001 Accepted; Q-8…Q-11 ratified) |
+| 4 | API Design | ⬜ **NEXT** |
 | 5 | DB Design | ⬜ Pending |
 | 6 | UI Design | ⬜ Pending |
-| 7 | Implementation | ⬜ Pending (blocked: needs architecture decision) |
+| 7 | Implementation | ⬜ Pending (unblocked: architecture decision exists) |
 | 8 | Review | ⬜ Pending |
 | 9 | Validation | ⬜ Pending |
 
@@ -31,6 +31,12 @@
   - `docs/decision-log.md` — D-001 (validated), D-002 (7 confirmed decisions).
   - `docs/validation-log.md` — V-001 logged.
 - **Committed:** `c1ea376` — `docs(analysis): add product requirements analysis and confirmed decisions`.
+- **Step 2 — Architecture Alternatives** & **Step 3 — Human Decision** complete and human-validated.
+  - `docs/02-architecture-options.md` — drivers (incl. AD-7 maintainability), Hexagonal component decomposition, Options A/B/C, re-scored matrix (B 41).
+  - `docs/03-architecture-decision.md` — **ADR-001 (Accepted):** Hexagonal modular monolith + DB Outbox.
+  - `docs/prompts/002-architecture.md` — 2-iteration prompt trail (incl. human steering, verbatim), marked Accepted.
+  - `docs/decision-log.md` — D-003 (validated). `docs/validation-log.md` — V-002 logged.
+  - **Not yet committed** — pending approval.
 
 ---
 
@@ -48,15 +54,26 @@
 
 ---
 
+## Architecture decisions (confirmed by human, 2026-06-13)
+
+| # | Question | Decision |
+|---|----------|----------|
+| Q-9 | Architecture style & wiring | **Hexagonal modular monolith + DB Outbox** |
+| Q-8 | Implementation stack | **.NET 8** (ASP.NET Core Web API + EF Core / Npgsql) |
+| Q-10 | Admin UI | **SPA + JSON API** |
+| Q-11 | Datastore | **PostgreSQL** |
+
+---
+
 ## Next action
 
-**Step 2 — `/architect`** (solution-architect agent): produce architecture
-alternatives + a recommendation, grounded in the Q-1…Q-7 decisions above.
-Output target: `docs/02-architecture-options.md` and
-`docs/03-architecture-decision.md`.
+**Step 4 — API Design** (`docs/04-api-design.md`): define the JSON API contracts
+mirroring the application use cases and ports (Users, Alerts, Notifications;
+poll/dispatch are internal). Then Step 5 DB Design, Step 6 UI Design — before any
+implementation code.
 
-> ⚠️ **Agent Invocation Rule:** Implementation (Step 7) must not begin until an
-> architecture decision exists. Currently blocked.
+> ✅ **Agent Invocation Rule:** an architecture decision now exists (ADR-001
+> Accepted), so implementation is unblocked — but Steps 4–6 must still precede it.
 
 ---
 
