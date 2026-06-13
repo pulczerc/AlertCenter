@@ -21,3 +21,7 @@ From `01-requirements-analysis.md` §6:
 - **Q-5** Delivery: live vs mocked — mocked, pluggable sender
 - **Q-6** Admin auth in MVP: yes vs no — minimal/none
 - **Q-7** Matching: whole-word vs substring — whole-word, case-insensitive
+
+Raised during design (open):
+
+- **Q-12** SPA framework (from `07-ui-design.md` §2) — **open**; recommendation **React + Vite + TypeScript** (Razor server-rendered = timebox-contingency fallback). Awaiting human decision.
