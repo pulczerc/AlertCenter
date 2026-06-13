@@ -142,6 +142,7 @@ transaction** as its Notification.
 |-------|------|-------|
 | `Id` | OutboxId (VO) | |
 | `NotificationId` | NotificationId | 1:1 with Notification |
+| `Payload` | OutboxMessage (VO) | rendered at enqueue: recipient/subject/body (RF-005-D) |
 | `Status` | OutboxStatus | `Pending → Done \| Dead` |
 | `Attempts` | int | incremented per dispatch try |
 | `AvailableAt` | instant | next eligible dispatch time (backoff) |

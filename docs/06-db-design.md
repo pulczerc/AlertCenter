@@ -110,6 +110,7 @@ CREATE INDEX ix_notifications_alert   ON notifications(alert_id);
 CREATE TABLE outbox (
     id              uuid PRIMARY KEY,
     notification_id uuid NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+    payload         jsonb NOT NULL,        -- rendered message {recipient,subject,body} (RF-005-D)
     status          text NOT NULL DEFAULT 'pending'
                     CHECK (status IN ('pending','done','dead')),
     attempts        int  NOT NULL DEFAULT 0,
@@ -119,6 +120,10 @@ CREATE TABLE outbox (
     created_at      timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_outbox_notification UNIQUE (notification_id)          -- O1 (1:1)
 );
+-- `payload` is rendered from match-time data at enqueue (recipient = owner email for
+-- Email / system webhook target for Slack) so the dispatcher needs NO cross-module
+-- reads and the Channels adapter stays domain-ignorant. Channel creds stay in config,
+-- never in payload (NFR-4). Consistent with the channel snapshot (N3). SQLite: `text` (JSON).
 -- partial index drives the lease query cheaply:
 CREATE INDEX ix_outbox_due ON outbox(available_at) WHERE status = 'pending';
 ```
@@ -139,8 +144,8 @@ BEGIN;
   VALUES (:id, :alert, :article, :channel, 'pending')
   ON CONFLICT (alert_id, article_id) DO NOTHING;        -- idempotent (FR-7, AC-2)
 
-  INSERT INTO outbox (id, notification_id, status, available_at)
-  SELECT :outboxId, :id, 'pending', now()
+  INSERT INTO outbox (id, notification_id, payload, status, available_at)
+  SELECT :outboxId, :id, :payload, 'pending', now()          -- payload rendered now (RF-005-D)
   WHERE EXISTS (SELECT 1 FROM notifications WHERE id = :id);  -- only if just inserted
 
   -- ... repeat per matched alert ...

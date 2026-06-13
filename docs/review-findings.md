@@ -5,7 +5,55 @@
 
 ---
 
-## RF-004 — Step 6 UI design (admin SPA)
+## RF-005 — Implementation plan
+
+> **Date:** 2026-06-13 · **Reviewer:** Principal Engineer (AI-assisted, `reviewer` agent)
+> **Artifact:** [`08-implementation-plan.md`](08-implementation-plan.md), cross-checked vs the design set (04–07) and the CLAUDE.md timebox.
+> **Verdict:** ⚠️ **Conditionally accept** — the stream split, hexagon-first ordering, and dependency graph are right; but the plan is scoped as the *full* build against a 3–4h box and leaves two concrete wiring gaps. 1 high, 4 medium, 3 low.
+> **Resolution (2026-06-13, solution-architect):** all 8 actioned in `08` (+ `04`/`06` ripple for D):
+> - **A** — re-anchored to a minimum-shippable **vertical slice**; infra defaulted down (SQLite, direct calls, no MediatR/NetArchTest/CI); rest marked 🔶 stretch.
+> - **B** — per-wave time estimates + a **must-ship line (~2.5h)** + cut-line added.
+> - **C** — `EvaluateAlerts` wired into a single **IngestionHostedService** (poll→evaluate per tick over the `evaluated_at` backlog).
+> - **D** — `OutboxMessage` **rendered at enqueue** and stored in a new outbox `payload` column (`06`/`04`); dispatcher does no cross-module reads.
+> - **E** — parallelization reframed as logical independence, not wall-clock.
+> - **F** — test layers prioritized (domain unit must; integration/SPA stretch).
+> - **G** — dev seeder scheduled (Wave 4/6).
+> - **H** — manual EF config noted for partial indexes / CHECK enums / raw lease SQL.
+
+### 🔴 High
+
+| ID | Finding | Location | Status |
+|----|---------|----------|--------|
+| **A** | **Over-scoped vs the 3–4h timebox; the contingency is a footnote when it should be the spine.** Waves 0–4 describe a multi-project solution + 3 test projects (Testcontainers + WebApplicationFactory) + MediatR + NetArchTest + CI + a full React SPA with its own test stack. That is not buildable in the remaining budget (most of the 3–4h was spent on the design/review docs). **Re-anchor:** make the **Wave-3 vertical slice the primary, must-ship plan** (poll→match→outbox→mock-send→GET /notifications, SQLite ok), and mark everything else **explicitly "stretch."** Default *down* the heavy infra (Testcontainers→in-memory/SQLite, MediatR→direct calls, drop NetArchTest/CI) unless time remains. | §1, §8, §10 | ✅ Resolved |
+
+### 🟡 Medium
+
+| ID | Finding | Location | Status |
+|----|---------|----------|--------|
+| **B** | **No time estimates** — the user asked for "estimated implementation order," and a timeboxed build is unmanageable without rough per-wave budgets + a hard cut-line. Add minutes per wave and the stop-point. | §8 | ✅ Resolved |
+| **C** | **The `EvaluateAlerts` step isn't wired to a scheduler.** There are two hosted services (poll, dispatch) but evaluation lives between them; the plan never says *what runs it* (poll tick → evaluate inline? a third timer?). Specify, consistent with the `evaluated_at` watermark driver (RF-003-B). | §3/§4 | ✅ Resolved |
+| **D** | **Dispatch payload assembly is undefined.** `INotificationChannel.Send(...)` needs a recipient + content — Email = the owner's address (Alerts module), Slack = system webhook (Q-3). The `06` outbox row stores **no payload**, so at dispatch the dispatcher must re-resolve notification→alert→user→article across modules. Define the `Send` contract and *who assembles the message* (resolve via ports at dispatch, or store a rendered payload at enqueue) so the Channels adapter stays domain-ignorant. | §3/§4 (+ ripple to `06`) | ✅ Resolved |
+| **E** | **"Parallel streams" overstates the benefit for a solo (AI) implementer.** Four streams can't run concurrently in wall-clock with one builder; the real value is **logical independence / safe reordering & cutting**, not time saved. Reframe so estimates aren't read as "4× faster." | §7 | ✅ Resolved |
+
+### 🟢 Low
+
+| ID | Finding | Location | Status |
+|----|---------|----------|--------|
+| **F** | Test/tooling surface is heavy (3 test projects + MSW + optional Playwright + NetArchTest + CI). Prioritize: domain unit tests are must-have; gate the rest on remaining time. | §3–§6 | ✅ Resolved |
+| **G** | No **dev seed data** (a user + an alert) — without it the demo SPA shows empty screens (AC-4). Add a tiny dev seeder. | §8/§10 | ✅ Resolved |
+| **H** | EF migrations won't auto-reproduce `06`'s **partial indexes** (`WHERE status='pending'`), **CHECK** enums, and the **raw `SKIP LOCKED` lease** — these need manual EF config / raw SQL. Call it out so it isn't assumed free. | §4 | ✅ Resolved |
+
+### ✅ Affirmed sound
+- Hexagon-first ordering and **ports-first critical path** are correct.
+- **Core kept MediatR-free** via an `IEventPublisher` port — preserves AD-7 purity.
+- Dependency graph correctly identifies **Frontend independence** (frozen contract) and **Infra ∥ API** after ports.
+- DoD mapped to AC-1…AC-5; durability (watermark + outbox) carried through from RF-003.
+
+### Recommendation
+Re-anchor to the timebox (**A**) with estimates (**B**), and close the two wiring gaps
+(**C**, **D**) — those are correctness, not polish. **E/F/G/H** are cheap clarifications.
+The structure itself doesn't need rework.
+
 
 > **Date:** 2026-06-13 · **Reviewer:** Principal Engineer (AI-assisted, `reviewer` agent)
 > **Artifact:** [`07-ui-design.md`](07-ui-design.md), cross-checked vs [`05-api-design.md`](05-api-design.md), [`04-domain-model.md`](04-domain-model.md)
