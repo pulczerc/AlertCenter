@@ -25,7 +25,10 @@ var app = builder.Build();
 // Slice: create the schema on startup (EnsureCreated; migrations are stretch).
 using (var scope = app.Services.CreateScope())
 {
-    scope.ServiceProvider.GetRequiredService<AlertCenterDbContext>().Database.EnsureCreated();
+    var db = scope.ServiceProvider.GetRequiredService<AlertCenterDbContext>();
+    db.Database.EnsureCreated();
+    if (app.Environment.IsDevelopment())
+        await DevSeed.EnsureSeededAsync(db); // demo data so the SPA isn't empty (RF-005-G)
 }
 
 app.UseExceptionHandler();
