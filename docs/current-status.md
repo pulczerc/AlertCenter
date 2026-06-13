@@ -21,6 +21,10 @@
 | 8 | Review | ⬜ Pending |
 | 9 | Validation | ⬜ Pending |
 
+> `docs/04-api-design.md`, `05-db-design.md`, `06-ui-design.md` exist only as
+> empty **(stub)** placeholders — they hold no content yet and do not represent
+> completed work. Steps 4–6 are genuinely pending.
+
 ---
 
 ## What's done

@@ -40,6 +40,11 @@ Accordingly this revision:
 | AD-5 | **Secret hygiene** — channel creds are config, never committed | NFR-4, R-4, AC-5 | ★★ |
 | AD-6 | **Single deployable** — demo scale, single tenant, no distributed infra | A-1, NFR-1 | ★★ |
 
+> *Note on IDs:* AD-numbers are **stable identifiers assigned in the order
+> drivers were introduced** (AD-7 was added by the human steer of 2026-06-13),
+> not priority ranks — the table is **sorted by weight**. IDs are kept stable on
+> purpose because they are referenced across this doc and the ADR.
+
 > The tension is **AD-1 vs AD-7**. The human has resolved it in favor of clean
 > boundaries; the recommended option (§3.B) is chosen to satisfy AD-7 while keeping
 > the AD-1 cost bounded (hexagonal structure is mostly *discipline*, not extra
@@ -130,7 +135,7 @@ Single deployable structured as §2: pure domain, application with explicit
   - Natural, non-disruptive evolution path to a real broker (the outbox dispatcher becomes a queue consumer) — without committing to distribution now.
   - Still a **single deployable** (AD-6); mock-first delivery (Q-5, A-2).
 - **Cons:**
-  - More upfront structure (interfaces, two timed use cases, outbox lease to avoid double-send) → a bounded AD-1 cost (~30–60 min over the coupled A).
+  - More upfront structure (interfaces, two timed use cases, outbox lease to avoid concurrent double-dispatch, PostgreSQL, separate SPA) → a real AD-1 cost that revives R-1; mitigated by the timebox contingency in [`03`](03-architecture-decision.md).
 - **Verdict:** ✓ Recommended — the human-directed target.
 
 ### Option C — Separated services + message broker — *rejected*
@@ -147,7 +152,7 @@ Distinct Ingestion/Matching/Delivery services over RabbitMQ/Redis.
 
 - **Scheduling** — in-process timers (two driving adapters: poll, dispatch); configurable interval, default 5m (NFR-5). No external cron.
 - **Dedup** — DB-level: `unique(source, guid)` on articles (FR-3), `unique(alert_id, article_id)` on notifications (FR-7) → restart-idempotent (R-6).
-- **Outbox** — one row per pending delivery with `status`, `attempts`, `last_error`, `available_at`; leased by the dispatcher via PostgreSQL `SELECT … FOR UPDATE SKIP LOCKED` (clean concurrency-safe leasing, no double-send); simple capped retry/backoff (NFR-2, AD-4).
+- **Outbox** — one row per pending delivery with `status`, `attempts`, `last_error`, `available_at`; leased by the dispatcher via PostgreSQL `SELECT … FOR UPDATE SKIP LOCKED` (clean concurrency-safe leasing — no concurrent double-lease; delivery is at-least-once per NFR-2, dedup of notification rows via FR-7 not of sends); simple capped retry/backoff (NFR-2, AD-4).
 - **Matching** — pure domain function; lower-cased word-boundary tokens (Q-7), OR (Q-1), title+summary (Q-2).
 - **Sender seam** — `NotificationSenderPort` resolved by channel enum; **mock binding default** (Q-5); real senders read creds from env only (NFR-4).
 - **Secrets** — env / untracked local settings; committed `.example` documents shape without values (AC-5, R-4).
@@ -156,7 +161,7 @@ Distinct Ingestion/Matching/Delivery services over RabbitMQ/Redis.
 
 ## 5. Stack candidates (sub-decision — Q-8)
 
-All support hexagonal layering + scheduled workers + SQLite + server-rendered admin.
+All support hexagonal layering + scheduled workers + PostgreSQL (the ratified store, Q-11) + a JSON API for the SPA admin (Q-10).
 
 | Stack | Fit notes | Timebox |
 |-------|-----------|---------|
@@ -170,22 +175,32 @@ All support hexagonal layering + scheduled workers + SQLite + server-rendered ad
 
 ## 6. Comparison matrix
 
-Scored against the weighted drivers (3 = strong, 1 = weak).
+**This matrix corroborates a decision the human already directed (Option B); it
+does not make it.** Cell scores are 1 (weak) / 2 (moderate) / 3 (strong).
+**Weights: ★★★ = 3, ★★ = 2.** Each total is `Σ (cell × weight)` — shown below so
+the arithmetic is reproducible, not asserted.
 
 | Driver (weight) | A (coupled) | **B (hexagonal + outbox)** | C (services) |
 |---|:--:|:--:|:--:|
-| AD-1 Timebox ★★★ | 3 | **2** | 1 |
-| AD-7 Maintainability/testability ★★★ | 1 | **3** | 3 |
-| AD-2 Extensibility ★★★ | 2 | **3** | 3 |
-| AD-3 Observability ★★ | 2 | **3** | 3 |
-| AD-4 Reliability/retry ★★ | 2 | **3** | 3 |
-| AD-5 Secret hygiene ★★ | 3 | 3 | 3 |
-| AD-6 Single deployable ★★ | 3 | **3** | 1 |
-| **Weighted total** | 33 | **41** | 35 |
+| AD-1 Timebox ×3 | 3 | **2** | 1 |
+| AD-7 Maintainability/testability ×3 | 1 | **3** | 3 |
+| AD-2 Extensibility ×3 | 2 | **3** | 3 |
+| AD-3 Observability ×2 | 2 | **3** | 3 |
+| AD-4 Reliability/retry ×2 | 2 | **3** | 3 |
+| AD-5 Secret hygiene ×2 | 3 | 3 | 3 |
+| AD-6 Single deployable ×2 | 3 | **2** ¹ | 1 |
+| **Weighted total** | **38** | **46** | **41** |
+
+> ¹ Option B scores **2**, not 3, on AD-6: the ratified separate SPA (Q-10) is a
+> second deployable surface, so B is not a *pure* single deployable. The penalty
+> is reflected here to keep the score honest against the ADR consequences.
+
+Arithmetic: **A** = 3·3+1·3+2·3+2·2+2·2+3·2+3·2 = **38**; **B** =
+2·3+3·3+3·3+3·2+3·2+3·2+2·2 = **46**; **C** = 1·3+3·3+3·3+3·2+3·2+3·2+1·2 = **41**.
 
 > With maintainability weighted as a top driver (human steer), **Option B wins
-> clearly**. A is penalized for coupling; C scores well on quality but is dominated
-> by its infra cost against AD-1/AD-6.
+> clearly (46)**. A (38) is penalized for coupling; C (41) scores well on quality
+> but is dominated by its infra cost against AD-1/AD-6.
 
 ---
 

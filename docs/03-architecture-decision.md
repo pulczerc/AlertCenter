@@ -82,15 +82,41 @@ Outbox**, a single deployable, structured as:
 
 **Negative / accepted trade-offs**
 - More upfront structure than the coupled Option A (interfaces, two timed use
-  cases, outbox leasing) — a bounded ~30–60 min AD-1 cost, accepted by the human
-  in exchange for maintainability.
+  cases, outbox leasing, PostgreSQL, a separate SPA) — a real AD-1 cost that
+  revives **R-1 (timebox overrun, High)**. Accepted by the human in exchange for
+  maintainability, **conditional on the contingency below** to protect a running
+  demo.
 - A **separate SPA frontend** (Q-10) adds build/tooling and a second deployable
   surface vs. server-rendered — accepted for a cleaner client/server split.
 - **PostgreSQL** (Q-11) adds infra setup (a local container/service) vs. an
   embedded store — accepted; in return its `FOR UPDATE SKIP LOCKED` gives
-  concurrency-safe outbox leasing with no double-send.
+  concurrency-safe outbox leasing (no concurrent double-*lease*). **Delivery is
+  at-least-once (NFR-2):** a crash after a successful send but before the status
+  commit can re-send on restart; `unique(alert_id, article_id)` dedups
+  notification *rows*, not sends. Exactly-once is explicitly out of scope.
 - Single process for the backend is a single point of failure — accepted at demo
   scale (A-1).
+
+### Timebox contingency (R-1)
+
+The clean architecture is the target, but a **running demo outranks completeness**
+within the 3–4h box. If implementation runs long, cut in this order — each cut
+preserves the hexagonal core (ports/adapters, pure domain) so the *demonstrated*
+design is intact even when an adapter is downgraded:
+
+1. **Datastore** — swap PostgreSQL for **SQLite** behind the same repository/outbox
+   ports. Loses `FOR UPDATE SKIP LOCKED`; acceptable because the dispatcher is
+   single-instance at demo scale (A-1), so concurrent leasing isn't exercised.
+2. **Admin UI** — drop the separate SPA for a **minimal server-rendered admin**
+   (or even read-only API + a static page). The JSON API/use cases are unchanged.
+3. **Scheduler** — collapse the two timers into **one tick** that runs
+   poll → evaluate → dispatch sequentially. Loses async decoupling, keeps the
+   outbox table and lifecycle.
+4. **Channels** — ship **mock senders only** (already the default, Q-5); real
+   SMTP/Slack adapters become post-demo work.
+
+Cut from the top; stop as soon as the box is met. None of these change the domain
+or the port contracts, so they are reversible after the timebox.
 
 ### Sub-decisions — ratified by human (Step 3, 2026-06-13)
 
