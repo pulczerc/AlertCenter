@@ -14,16 +14,19 @@
 | 1 | Product Analysis | ✅ **Complete & validated** |
 | 2 | Architecture Alternatives | ✅ **Complete & validated** |
 | 3 | Human Decision | ✅ **Complete** (ADR-001 Accepted; Q-8…Q-11 ratified) |
-| 4 | API Design | ⬜ **NEXT** |
-| 5 | DB Design | ⬜ Pending |
-| 6 | UI Design | ⬜ Pending |
+| 4 | API Design | 🟦 **Drafted** — awaiting Reviewer + human validation |
+| 5 | DB Design | 🟦 **Drafted** — awaiting Reviewer + human validation |
+| 6 | UI Design | ⬜ Pending (to be `docs/07-ui-design.md`) |
 | 7 | Implementation | ⬜ Pending (unblocked: architecture decision exists) |
 | 8 | Review | ⬜ Pending |
 | 9 | Validation | ⬜ Pending |
 
-> `docs/04-api-design.md`, `05-db-design.md`, `06-ui-design.md` exist only as
-> empty **(stub)** placeholders — they hold no content yet and do not represent
-> completed work. Steps 4–6 are genuinely pending.
+> **Design docs (renumbered, human-directed 2026-06-13):** a **Domain Model** was
+> added ahead of the API/DB designs. Current set:
+> [`04-domain-model.md`](04-domain-model.md), [`05-api-design.md`](05-api-design.md),
+> [`06-db-design.md`](06-db-design.md) — all **Drafts**. The old empty stubs
+> (`04-api-design.md`, `05-db-design.md`, `06-ui-design.md`) were removed. **UI
+> Design** (mandatory Step 6) is still to come as `07-ui-design.md`.
 
 ---
 
