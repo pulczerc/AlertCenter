@@ -17,7 +17,7 @@
 | 4 | API Design | ✅ **Complete & validated** (RF-003 applied; V-004 / D-007) |
 | 5 | DB Design | ✅ **Complete & validated** (RF-003 applied; V-004 / D-007) |
 | 6 | UI Design | ✅ **Complete & validated** (RF-004 applied; V-005 / D-008; framework React+Vite+TS) |
-| 7 | Implementation | ⬜ **NEXT** — all design steps validated; unblocked |
+| 7 | Implementation | 🟦 **Planned** ([`08-implementation-plan.md`](08-implementation-plan.md), RF-005 applied) — awaiting go-ahead to start Wave 0 |
 | 8 | Review | ⬜ Pending |
 | 9 | Validation | ⬜ Pending |
 
