@@ -46,6 +46,8 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<PollFeedsUseCase>();
         services.AddScoped<EvaluateAlertsUseCase>();
         services.AddScoped<DispatchOutboxUseCase>();
+        services.AddScoped<ManageUsersUseCase>();
+        services.AddScoped<ManageAlertsUseCase>();
 
         // Background timers
         services.Configure<SchedulingOptions>(config.GetSection(SchedulingOptions.Section));
