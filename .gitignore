@@ -1,0 +1,29 @@
+# .NET build output
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+artifacts/
+
+# Rider / VS
+.idea/
+.vs/
+
+# Test results
+[Tt]est[Rr]esults/
+*.trx
+
+# Local app data / SQLite
+*.db
+*.db-shm
+*.db-wal
+
+# Secrets / local config (NFR-4, AC-5) — only *.example.json is committed
+appsettings.*.local.json
+secrets.json
+
+# Node / frontend
+web/node_modules/
+web/dist/
+npm-debug.log*
