@@ -66,9 +66,10 @@
 { "id": "uuid", "name": "Ada", "email": "ada@x.io", "enabled": true,
   "createdAt": "2026-06-13T10:00:00Z" }
 
-// AlertDto
-{ "id": "uuid", "userId": "uuid", "keywords": ["openai","merger"],
-  "channel": "email", "enabled": true, "createdAt": "2026-06-13T10:00:00Z" }
+// AlertDto  (ownerName added by RF-004-A — additive, non-breaking)
+{ "id": "uuid", "userId": "uuid", "ownerName": "Ada Lovelace",
+  "keywords": ["openai","merger"], "channel": "email", "enabled": true,
+  "createdAt": "2026-06-13T10:00:00Z" }
 
 // NotificationDto
 { "id": "uuid", "alertId": "uuid", "articleId": "uuid", "channel": "slack",

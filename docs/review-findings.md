@@ -5,7 +5,49 @@
 
 ---
 
-## RF-003 — Step 4–6 design drafts (domain model, API, DB)
+## RF-004 — Step 6 UI design (admin SPA)
+
+> **Date:** 2026-06-13 · **Reviewer:** Principal Engineer (AI-assisted, `reviewer` agent)
+> **Artifact:** [`07-ui-design.md`](07-ui-design.md), cross-checked vs [`05-api-design.md`](05-api-design.md), [`04-domain-model.md`](04-domain-model.md)
+> **Verdict:** ⚠️ **Conditionally accept** — clean and correctly scoped to the validated API, but three UI↔contract mismatches need a cheap fix. 0 high, 3 medium, 5 low.
+> **Resolution (2026-06-13, step-by-step human decision):** all 8 findings actioned in `07` (and `05` for A). Summary:
+> - **A** — `ownerName` added to `AlertDto` (`05`, additive/non-breaking); list reads it directly.
+> - **B** — editing a disabled-owner alert is **blocked** with a re-enable notice.
+> - **C** — ops "last poll/dispatch" lines marked **session-only**; health contract unchanged.
+> - **D** — Notifications gains a **by-alert** filter.
+> - **E** — **off-by-default auto-refresh** toggle (15/30s polling) on Notifications/Ops.
+> - **F** — `failed` documented as **terminal** (no manual re-queue in MVP).
+> - **G** — keyword chips show limits (single word, ≤60) + **inline guard**.
+> - **H** — **history mode + server fallback** to `index.html` noted as an implementation constraint.
+
+### 🟡 Medium
+
+| ID | Finding | Location | Status |
+|----|---------|----------|--------|
+| **A** | **Alerts list renders an owner *name*, but `AlertDto` carries only `userId`.** §4.2 shows "Owner: Ada Lovelace"; the contract ([`05`](05-api-design.md) §3.2) returns `userId` with no display field. Either (a) embed an `ownerName`/`user` summary in `AlertDto`, or (b) state that the SPA fetches `/users` once and joins client-side. Pick one — as written the screen can't be built from the contract. | [`07`](07-ui-design.md) §4.2 | ✅ Resolved |
+| **B** | **Owner picker = "enabled users only" breaks editing an alert whose owner is later disabled.** That owner would vanish from the picker, blocking edits to an existing alert. Define: show the current owner even if disabled (read-only), or disallow editing disabled-owner alerts. | [`07`](07-ui-design.md) §4.2 | ✅ Resolved |
+| **C** | **Ops panel shows "Last poll / Last dispatch" stats, but `GET /ops/health` returns only `{status, outboxPending}`.** Those lines can't populate on load — only transiently after a manual trigger. Either extend the health contract to return last-run stats, or mark them session-only in the design. | [`07`](07-ui-design.md) §4.4 vs [`05`](05-api-design.md) §7 | ✅ Resolved |
+
+### 🟢 Low
+
+| ID | Finding | Location | Status |
+|----|---------|----------|--------|
+| **D** | Notifications filter bar omits `alertId`, though the API supports it ([`05`](05-api-design.md) §6). Add a "by alert" filter (or note the omission). | [`07`](07-ui-design.md) §4.3 | ✅ Resolved |
+| **E** | No auto-refresh on the Notifications/Ops "is it working?" view — manual only. The Operator persona's core need is confirming matches fire; consider an optional poll-refresh toggle (A-6). | [`07`](07-ui-design.md) §4.3/4.4 | ✅ Resolved |
+| **F** | `failed` notifications are terminal with **no UI remediation** (no re-queue). Acceptable for MVP, but state it as a deliberate scope boundary. | [`07`](07-ui-design.md) §4.3 | ✅ Resolved |
+| **G** | Keyword chips input doesn't surface the **limits** (≤60 chars, and a max count) the API/DB enforce. Show them to avoid silent `422`s. | [`07`](07-ui-design.md) §4.2 | ✅ Resolved |
+| **H** | SPA history-mode routes need a **server fallback to `index.html`** for deep links when served by the .NET app — note it as an implementation constraint. | [`07`](07-ui-design.md) §3 | ✅ Resolved |
+
+### ✅ Affirmed sound
+- **No new API surface** — every screen maps to existing `/api/v1` endpoints (§7).
+- Honors the validated D-007 decisions (single-token keyword chips, no-back-match hint, ops panel, read-only notifications).
+- Error/empty/loading states bound to the RFC-7807 model; status conveyed by text **+** icon (a11y).
+- Correct MVP scoping — no subscriber UI, no auth screens, no analytics.
+
+### Recommendation
+Resolve **A/B/C** (contract alignment — doc edits, no redesign) before implementation;
+**D–H** are cheap clarifications. The open **Q-12** (framework) is a separate human decision, not a defect.
+
 
 > **Date:** 2026-06-13 · **Reviewer:** Principal Engineer (AI-assisted, `reviewer` agent)
 > **Artifacts:** [`04-domain-model.md`](04-domain-model.md), [`05-api-design.md`](05-api-design.md), [`06-db-design.md`](06-db-design.md)

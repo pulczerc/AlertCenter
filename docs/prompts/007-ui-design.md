@@ -36,14 +36,14 @@ the validated `/api/v1` contract; layout, flows, states — no component code.
 
 # Human Review
 
-Accepted: _pending_ — draft awaiting Reviewer pass + human validation.
+Accepted: after the Reviewer pass + step-by-step decisions — see
+[`008-ui-review-validation.md`](008-ui-review-validation.md).
 
 Rejected: —
 
-Modified: —
+Modified: RF-004 fixes A–H applied; Q-12 decided (React + Vite + TS).
 
 # Decision
 
-_Pending._ Next: Reviewer challenge (→ `review-findings.md`) and human validation,
-then a decision on Q-12 (framework). Implementation (Step 7) unblocks once the design
-set is validated.
+Validated (**V-005 / D-008**). The full design set (04–07) is now validated;
+implementation (Step 7) is unblocked.

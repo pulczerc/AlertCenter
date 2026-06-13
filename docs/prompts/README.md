@@ -12,3 +12,4 @@ Review → Decision** (template: [`../templates/prompt-template.md`](../template
 | [`005-design-review.md`](005-design-review.md) | Design review (RF-003) + fixes |
 | [`006-design-validation.md`](006-design-validation.md) | Human validation of the design phase (V-004 / D-007) |
 | [`007-ui-design.md`](007-ui-design.md) | 6 — UI design (admin SPA) |
+| [`008-ui-review-validation.md`](008-ui-review-validation.md) | UI review (RF-004) + step-by-step decisions + validation (V-005 / D-008) |
