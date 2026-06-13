@@ -14,9 +14,9 @@
 | 1 | Product Analysis | ✅ **Complete & validated** |
 | 2 | Architecture Alternatives | ✅ **Complete & validated** |
 | 3 | Human Decision | ✅ **Complete** (ADR-001 Accepted; Q-8…Q-11 ratified) |
-| 4 | API Design | 🟦 **Drafted + Reviewed** (RF-003 applied) — awaiting human validation |
-| 5 | DB Design | 🟦 **Drafted + Reviewed** (RF-003 applied) — awaiting human validation |
-| 6 | UI Design | ⬜ Pending (to be `docs/07-ui-design.md`) |
+| 4 | API Design | ✅ **Complete & validated** (RF-003 applied; V-004 / D-007) |
+| 5 | DB Design | ✅ **Complete & validated** (RF-003 applied; V-004 / D-007) |
+| 6 | UI Design | ⬜ **NEXT** (to be `docs/07-ui-design.md`) |
 | 7 | Implementation | ⬜ Pending (unblocked: architecture decision exists) |
 | 8 | Review | ⬜ Pending |
 | 9 | Validation | ⬜ Pending |

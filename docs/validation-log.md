@@ -5,3 +5,4 @@
 | V-001 | 2026-06-12 | `01-requirements-analysis.md` + 7 ambiguity decisions | Human (csaba.pulczer) | ✅ Accepted, all defaults confirmed |
 | V-002 | 2026-06-13 | `02-architecture-options.md`, `03-architecture-decision.md` (ADR-001) + Q-8…Q-11 | Human (csaba.pulczer) | ✅ Accepted — Hexagonal monolith + DB Outbox; .NET 8 / SPA+API / PostgreSQL |
 | V-003 | 2026-06-13 | `adr/ADR-002-architect-review.md` (amends ADR-001) + RF-002 | Human (csaba.pulczer) | ✅ Accepted — inter-module communication: module isolation + MediatR (fan-out only) + Outbox durability boundary |
+| V-004 | 2026-06-13 | `04-domain-model.md`, `05-api-design.md`, `06-db-design.md` (RF-003 applied) | Human (csaba.pulczer) | ✅ Accepted via step-by-step review — 6 design decisions confirmed as drafted (see D-007); no edits required |
