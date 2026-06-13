@@ -16,8 +16,8 @@
 | 3 | Human Decision | ✅ **Complete** (ADR-001 Accepted; Q-8…Q-11 ratified) |
 | 4 | API Design | ✅ **Complete & validated** (RF-003 applied; V-004 / D-007) |
 | 5 | DB Design | ✅ **Complete & validated** (RF-003 applied; V-004 / D-007) |
-| 6 | UI Design | 🟦 **Drafted** (`docs/07-ui-design.md`) — awaiting Reviewer + human validation |
-| 7 | Implementation | ⬜ Pending (unblocked: architecture decision exists) |
+| 6 | UI Design | ✅ **Complete & validated** (RF-004 applied; V-005 / D-008; framework React+Vite+TS) |
+| 7 | Implementation | ⬜ **NEXT** — all design steps validated; unblocked |
 | 8 | Review | ⬜ Pending |
 | 9 | Validation | ⬜ Pending |
 
