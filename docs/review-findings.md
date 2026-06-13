@@ -5,6 +5,59 @@
 
 ---
 
+## RF-003 — Step 4–6 design drafts (domain model, API, DB)
+
+> **Date:** 2026-06-13 · **Reviewer:** Principal Engineer (AI-assisted, `reviewer` agent)
+> **Artifacts:** [`04-domain-model.md`](04-domain-model.md), [`05-api-design.md`](05-api-design.md), [`06-db-design.md`](06-db-design.md)
+> **Verdict:** ⚠️ **Conditionally accept** — solid and well-traced, but two correctness/reliability defects must be fixed before implementation. 2 high, 3 medium, 4 low.
+> **Resolution (2026-06-13, solution-architect):** all 9 findings actioned across `04`/`05`/`06`. Summary:
+> - **A** — lease now pushes `available_at` (visibility timeout) + checks `leased_until`; double-dispatch closed.
+> - **B** — added `articles.evaluated_at` watermark; evaluation is a restartable query + same-txn watermark set, not an event.
+> - **C** — MVP keyword = single token (no whitespace); phrase matching explicitly deferred; validation + invariant K1 updated.
+> - **D** — `attempts` removed from `notifications`; outbox is the retry mechanism-of-record; `last_error` only on terminal failure.
+> - **E** — SQLite contingency now lists the `uuid`/`timestamptz`/`now()`/`varchar` substitutions.
+> - **F** — no-back-matching scope stated in domain §5.2.
+> - **G** — ops endpoints return `200` (synchronous), not `202`.
+> - **H** — `POST /alerts`: unknown user → `404`, disabled user → `422`.
+> - **I** — history FKs (`alerts.user_id`, `notifications.*`) changed to `ON DELETE RESTRICT`.
+
+### 🔴 High
+
+| ID | Finding | Location | Status |
+|----|---------|----------|--------|
+| **A** | **Outbox lease is not actually concurrency-safe as written.** The lease statement sets `leased_until` but the selection predicate filters only `status='pending' AND available_at<=now()` — it **never reads `leased_until`**, and `available_at` is left unchanged. Once the lease txn commits, `SKIP LOCKED` no longer protects the row, so a second dispatcher re-selects a leased-but-unsent entry → **double-dispatch**. This silently breaks the "no concurrent double-lease" guarantee the design claims (cf. RF-001 H-2). **Fix:** on lease, also push `available_at = now() + lease_window` (visibility timeout) **and/or** add `AND (leased_until IS NULL OR leased_until < now())` to the predicate. Alternatively keep send inside the `FOR UPDATE` txn. | [`06`](06-db-design.md) §5 | ✅ Resolved |
+| **B** | **Ingest→match hop is non-durable and the match trigger is undefined → lost matches on crash.** Matching runs off `ArticleIngested` (in-process MediatR, non-durable) against "newly ingested articles," but "newly ingested" is never defined. If it means "articles from this poll cycle," a crash between the ingest commit and the match leaves those articles already persisted (no longer "new") and **never evaluated** — violating R-6 restart-idempotency. The Outbox protects *match→deliver* but nothing protects *ingest→match*. **Fix:** make evaluation restartable — e.g. a per-article `evaluated_at` watermark / "to-evaluate" marker queried by `EvaluateAlerts`, not a fired event. | [`04`](04-domain-model.md) §7, [`06`](06-db-design.md) §7 | ✅ Resolved |
+
+### 🟡 Medium
+
+| ID | Finding | Location | Status |
+|----|---------|----------|--------|
+| **C** | **Multi-word keyword semantics are contradictory/undefined.** §5.1 says a match is when a keyword "equals a token" (single whole word, Q-7) *and* "multi-word keywords match as an ordered token **subsequence**" — subsequence (non-contiguous) is almost certainly wrong (should be a contiguous phrase), and the requirements (Q-1/Q-2/Q-7) only ever defined single-token whole-word matching. **Decide:** disallow spaces in keywords for MVP, or define contiguous phrase matching explicitly. | [`04`](04-domain-model.md) §5.1 | ✅ Resolved |
+| **D** | **Duplicated delivery state with no system-of-record.** `attempts` and `last_error` live on **both** `notifications` and `outbox`, with no stated sync rule → drift. **Fix:** make `outbox` the mechanism-of-record for retries; `notifications` carries only terminal `status` (+ `last_error` on `failed`). | [`04`](04-domain-model.md) §3.5/3.6, [`06`](06-db-design.md) §3 | ✅ Resolved |
+| **E** | **SQLite contingency overstates compatibility.** "Identical tables/constraints" is optimistic: `timestamptz`, `now()`, `uuid`, and `varchar` semantics all differ in SQLite — the porting delta is more than just dropping `SKIP LOCKED`. **Fix:** note the type/default substitutions, or pick portable types up front. | [`06`](06-db-design.md) §6 | ✅ Resolved |
+
+### 🟢 Low
+
+| ID | Finding | Location | Status |
+|----|---------|----------|--------|
+| **F** | New alerts do not match already-ingested articles (FR-5 = "new" articles). Valid scope, but unstated — a demo surprise ("created an alert, nothing fired"). State it. | [`04`](04-domain-model.md) §5.2 | ✅ Resolved |
+| **G** | `ops/poll` / `ops/dispatch` return **202** with completion counts; 202 implies not-yet-processed. Use **200** since the work is done synchronously. | [`05`](05-api-design.md) §7 | ✅ Resolved |
+| **H** | `POST /alerts` for an unknown/disabled user mixes `404`/`422`. Pick one: `404` for missing user, `422` for disabled. | [`05`](05-api-design.md) §5 | ✅ Resolved |
+| **I** | `ON DELETE CASCADE` users→alerts→notifications conflicts with the "disable, never delete" stance and the value of notification history (FR-13); a stray delete would erase history. Consider `RESTRICT`. | [`06`](06-db-design.md) §3 | ✅ Resolved |
+
+### ✅ Affirmed sound
+- Module/aggregate decomposition matches ADR-002; isolation + port boundaries respected.
+- Pure `KeywordMatcher` (side-effect-free, unit-testable) — correct for AD-7/AC-2.
+- One-transaction match→enqueue with `ON CONFLICT DO NOTHING` — correct idempotency primitive (FR-7/R-6).
+- Channel snapshot on the notification (N3) protects delivery history from later alert edits.
+- Thorough FR/NFR/AC traceability in all three docs.
+
+### Recommendation
+Fix **A** and **B** (correctness/reliability) and resolve **C/D** before implementation;
+**E/F/G/H/I** are cheap doc edits. None require redesign — the architecture holds.
+
+---
+
 ## RF-002 — Independent architect review: inter-module communication
 
 > **Date:** 2026-06-13 · **Reviewer of record:** external architect · **Evaluated by:** Solution Architect (AI-assisted)

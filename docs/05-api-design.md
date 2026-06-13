@@ -121,10 +121,12 @@ Query: `userId` (uuid), `enabled` (bool), `channel`, `page`, `pageSize`.
 { "userId": "uuid", "keywords": ["openai", "merger"], "channel": "email" }
 ```
 Validation:
-- `userId` references an existing, **enabled** user → else `404`/`422`;
-- `keywords`: non-empty array, each 1–60 chars; de-duplicated case-insensitively (AL1/AL3);
+- `userId`: **unknown** user → `404`; **existing but disabled** user → `422` (RF-003-H);
+- `keywords`: non-empty array, each a **single token**, 1–60 chars, **no whitespace**
+  (RF-003-C); de-duplicated case-insensitively (AL1/AL3);
 - `channel ∈ {email,slack}` (AL2).
-→ `201` `AlertDto`, `Location`. Errors: `400`, `404` (unknown user), `422` (semantic).
+→ `201` `AlertDto`, `Location`. Errors: `400` (shape), `404` (unknown user),
+`422` (disabled user / empty or whitespace keyword).
 
 ### `GET /api/v1/alerts/{id}` → `200` `AlertDto` · `404`.
 
@@ -157,9 +159,11 @@ Query: `status` (`pending|sent|failed`), `alertId`, `userId`, `from`/`to` (ISO d
 
 | Method · Path | Maps to use case | Response |
 |---------------|------------------|----------|
-| `POST /api/v1/ops/poll` | `PollFeeds` (ingest now) | `202 {"ingested": 12, "new": 4}` |
-| `POST /api/v1/ops/dispatch` | `DispatchOutbox` (drain pending) | `202 {"dispatched": 3, "failed": 0}` |
+| `POST /api/v1/ops/poll` | `PollFeeds` (ingest now) | `200 {"ingested": 12, "new": 4}` |
+| `POST /api/v1/ops/dispatch` | `DispatchOutbox` (drain pending) | `200 {"dispatched": 3, "failed": 0}` |
 | `GET /api/v1/ops/health` | liveness + DB/outbox depth | `200 {"status":"ok","outboxPending":5}` |
+
+> These run **synchronously** and return `200` with the completed counts (RF-003-G).
 
 > These are **manual triggers** of the same use cases the timers call — they don't
 > bypass the domain or the outbox (M-4). First thing to put behind auth.

@@ -54,7 +54,7 @@ CREATE TABLE users (
 
 CREATE TABLE alerts (
     id          uuid PRIMARY KEY,
-    user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id     uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT, -- protect history (RF-003-I)
     channel     text NOT NULL CHECK (channel IN ('email','slack')),  -- AL2
     enabled     boolean     NOT NULL DEFAULT true,
     created_at  timestamptz NOT NULL DEFAULT now()
@@ -81,24 +81,28 @@ CREATE TABLE articles (
     link          text         NOT NULL,
     published_at  timestamptz  NULL,
     ingested_at   timestamptz  NOT NULL DEFAULT now(),
+    evaluated_at  timestamptz  NULL,        -- match watermark; NULL = not yet evaluated (RF-003-B)
     CONSTRAINT uq_articles_source_guid UNIQUE (source, guid)           -- FR-3, R-6
 );
-CREATE INDEX ix_articles_ingested ON articles(ingested_at);            -- "new since" scans
+CREATE INDEX ix_articles_ingested ON articles(ingested_at);
+-- restartable matching: the evaluation backlog, cheap to scan
+CREATE INDEX ix_articles_unevaluated ON articles(ingested_at) WHERE evaluated_at IS NULL;
 
 -- ── Notifications module ─────────────────────────────────────────────────────
 CREATE TABLE notifications (
     id          uuid PRIMARY KEY,
-    alert_id    uuid NOT NULL REFERENCES alerts(id)   ON DELETE CASCADE,
-    article_id  uuid NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+    alert_id    uuid NOT NULL REFERENCES alerts(id)   ON DELETE RESTRICT, -- protect history (RF-003-I)
+    article_id  uuid NOT NULL REFERENCES articles(id) ON DELETE RESTRICT,
     channel     text NOT NULL CHECK (channel IN ('email','slack')),    -- snapshot (N3)
     status      text NOT NULL DEFAULT 'pending'
                 CHECK (status IN ('pending','sent','failed')),         -- FR-10
     created_at  timestamptz NOT NULL DEFAULT now(),
     sent_at     timestamptz NULL,
-    attempts    int  NOT NULL DEFAULT 0,
-    last_error  text NULL,
+    last_error  text NULL,        -- copied from outbox only when status='failed' (RF-003-D)
     CONSTRAINT uq_notification_alert_article UNIQUE (alert_id, article_id)  -- FR-7, N1
 );
+-- NOTE: retry bookkeeping (attempts) lives ONLY on `outbox` — the dispatch
+-- mechanism-of-record. `notifications` holds the business-visible terminal status.
 CREATE INDEX ix_notifications_status  ON notifications(status);
 CREATE INDEX ix_notifications_created ON notifications(created_at DESC);    -- history view
 CREATE INDEX ix_notifications_alert   ON notifications(alert_id);
@@ -121,24 +125,33 @@ CREATE INDEX ix_outbox_due ON outbox(available_at) WHERE status = 'pending';
 
 ---
 
-## 4. The match→enqueue transaction (ADR-001 §Decision.4)
+## 4. The evaluate→enqueue transaction (ADR-001 §Decision.4, RF-003-B)
 
-On each match, **one transaction** writes the notification and its outbox row:
+One article is evaluated against all active alerts and the results are written in
+**one transaction** that *also* advances the article's `evaluated_at` watermark —
+so the whole step is restartable: a crash before commit leaves `evaluated_at` NULL
+and the article is re-picked next cycle; after commit it is never re-evaluated.
 
 ```sql
 BEGIN;
+  -- for each matched alert (0..N): notification + its outbox row
   INSERT INTO notifications (id, alert_id, article_id, channel, status)
   VALUES (:id, :alert, :article, :channel, 'pending')
   ON CONFLICT (alert_id, article_id) DO NOTHING;        -- idempotent (FR-7, AC-2)
 
   INSERT INTO outbox (id, notification_id, status, available_at)
   SELECT :outboxId, :id, 'pending', now()
-  WHERE EXISTS (SELECT 1 FROM notifications WHERE id = :id);  -- only if inserted
+  WHERE EXISTS (SELECT 1 FROM notifications WHERE id = :id);  -- only if just inserted
+
+  -- ... repeat per matched alert ...
+
+  UPDATE articles SET evaluated_at = now() WHERE id = :article;  -- watermark
 COMMIT;
 ```
 
-> `ON CONFLICT DO NOTHING` makes re-processing the same `(alert, article)`
-> harmless on restart (R-6) — no double notification, no orphan outbox row.
+> `ON CONFLICT DO NOTHING` + the `evaluated_at` watermark make re-processing the
+> same article (or the same `(alert, article)` pair) harmless on restart (R-6) — no
+> double notification, no orphan outbox row, no lost match.
 
 ---
 
@@ -148,17 +161,28 @@ COMMIT;
 -- lease a batch (PostgreSQL): no two dispatchers grab the same row
 WITH due AS (
     SELECT id FROM outbox
-    WHERE status = 'pending' AND available_at <= now()
+    WHERE status = 'pending'
+      AND available_at <= now()                       -- visibility-timeout gate
+      AND (leased_until IS NULL OR leased_until < now())  -- belt-and-suspenders (RF-003-A)
     ORDER BY available_at
     FOR UPDATE SKIP LOCKED
     LIMIT :batch
 )
 UPDATE outbox o
-   SET leased_until = now() + interval '30 seconds'
+   SET leased_until = now() + interval '30 seconds',
+       available_at = now() + interval '30 seconds'   -- KEY: push availability so a
+                                                       -- re-select can't grab a leased,
+                                                       -- not-yet-sent row after commit
   FROM due
  WHERE o.id = due.id
 RETURNING o.id, o.notification_id;
 ```
+
+> **Why both:** `SKIP LOCKED` only protects rows while the lease txn holds the lock.
+> After it commits, the row is unlocked again — so the lease must *also* push
+> `available_at` (a visibility timeout). Without it (the original draft), a second
+> dispatcher re-selected the leased-but-unsent row → double-dispatch (RF-003-A). On a
+> dead dispatcher the lease simply expires and the row becomes due again — at-least-once.
 
 Per leased entry the dispatcher sends via `INotificationChannel`, then:
 - **success** → `outbox.status='done'`; `notifications.status='sent', sent_at=now()`.
@@ -175,21 +199,34 @@ Per leased entry the dispatcher sends via `INotificationChannel`, then:
 
 ## 6. SQLite contingency (ADR-001 Timebox cut #1)
 
-If swapped to SQLite: identical tables/constraints; **drop `FOR UPDATE SKIP
-LOCKED`** and lease with a single-row `UPDATE … WHERE status='pending' AND
-available_at<=now() RETURNING …` loop. Safe because the dispatcher is
-single-instance at demo scale (A-1). All `CHECK`-based enums and `ON CONFLICT`
-clauses are SQLite-compatible — the only PG-specific feature is the lease hint.
+If swapped to SQLite the **shape** is identical but several types/defaults must be
+substituted (it is not a literal copy):
+
+| PostgreSQL | SQLite substitution |
+|------------|---------------------|
+| `uuid` | `TEXT` (store the canonical UUID string) |
+| `timestamptz` | `TEXT` ISO-8601 UTC (or INTEGER epoch) |
+| `now()` default | `CURRENT_TIMESTAMP`, or set in app via `ClockPort` |
+| `varchar(n)` | `TEXT` (length enforced in the domain) |
+| `FOR UPDATE SKIP LOCKED` lease | single-writer `UPDATE … WHERE status='pending' AND available_at<=now() … RETURNING` loop |
+
+`CHECK`-based enums, **partial indexes**, and `ON CONFLICT … DO NOTHING` are all
+SQLite-compatible. Dropping `SKIP LOCKED` is safe because the dispatcher is
+single-instance at demo scale (A-1); the `available_at` visibility timeout (§5)
+still prevents re-pickup of an in-flight row.
 
 ---
 
 ## 7. Matching strategy (data access)
 
-At demo scale, `EvaluateAlerts` loads **active** alerts + their keywords
-(`alerts.enabled AND users.enabled`, via `ix_alerts_enabled`) and runs the **pure
-`KeywordMatcher`** (Domain §5) in memory against newly ingested articles. No
-SQL-side text search is needed (and none of regex/FTS is in scope, A-3). If the
-ruleset ever grows, an inverted keyword index is the additive next step.
+At demo scale, `EvaluateAlerts` selects **un-evaluated** articles
+(`evaluated_at IS NULL`, via `ix_articles_unevaluated`), loads **active** alerts +
+their keywords (`alerts.enabled AND users.enabled`, via `ix_alerts_enabled`), and
+runs the **pure `KeywordMatcher`** (Domain §5) in memory. Each article is finalized
+by the §4 transaction (enqueue matches + set `evaluated_at`), so the pass is
+**restartable** and exactly-evaluates each article once (RF-003-B). No SQL-side text
+search is needed (regex/FTS is out of scope, A-3). If the ruleset ever grows, an
+inverted keyword index is the additive next step.
 
 ---
 

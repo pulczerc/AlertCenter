@@ -63,10 +63,14 @@ Notation: **(E)** entity · **(VO)** value object · **(AR)** aggregate root.
 | `Link` | Url (VO) | canonical article URL |
 | `PublishedAt` | instant? | from feed; nullable if feed omits it |
 | `IngestedAt` | instant | set on persist |
+| `EvaluatedAt` | instant? | match watermark; `null` = not yet evaluated (RF-003-B) |
 
 - **Invariant A1:** `(Source, Guid)` is unique across all articles (FR-3, R-6).
 - **Invariant A2:** `Title` non-empty; `Link` is a valid absolute URL.
-- Articles are **immutable** after ingestion (no edits/deletes in MVP).
+- **Invariant A3 (restartable matching):** an article is evaluated against alerts
+  exactly once; `EvaluatedAt` is set in the **same transaction** that enqueues its
+  matches (§7). A crash before commit leaves it `null` → re-evaluated next cycle.
+- Articles are otherwise **immutable** after ingestion (content never edited/deleted).
 
 ### 3.2 Alerts — `User` (AR/E)
 
@@ -104,7 +108,8 @@ Notation: **(E)** entity · **(VO)** value object · **(AR)** aggregate root.
 | `Text` | string | original term as entered |
 | `Normalized` | string | lower-cased, trimmed — the comparison key (Q-7) |
 
-- **Invariant K1:** `Normalized` is non-empty after trim/lowercase.
+- **Invariant K1:** `Normalized` is non-empty after trim/lowercase, and is a **single
+  token** (no internal whitespace — RF-003-C).
 - Equality is by `Normalized`.
 
 ### 3.5 Notifications — `Notification` (AR/E)
@@ -118,8 +123,11 @@ Notation: **(E)** entity · **(VO)** value object · **(AR)** aggregate root.
 | `Status` | NotificationStatus (VO/enum) | `Pending → Sent \| Failed` (FR-10) |
 | `CreatedAt` | instant | match time |
 | `SentAt` | instant? | set on success |
-| `Attempts` | int | delivery attempts (mirrors outbox) |
-| `LastError` | string? | last failure reason |
+| `LastError` | string? | copied from the outbox **only** when `Status = Failed` |
+
+> Retry bookkeeping (`Attempts`, backoff, `LastError` history) lives **only** on the
+> `OutboxEntry` — the dispatch mechanism-of-record. The `Notification` exposes only
+> the business-visible terminal outcome (RF-003-D), avoiding a duplicated source of truth.
 
 - **Invariant N1:** `(AlertId, ArticleId)` is unique (FR-7) — no duplicate notifications.
 - **Invariant N2:** `Status` follows the state machine in §4.1 (no `Sent → Pending`, etc.).
@@ -194,14 +202,29 @@ Implements FR-5 with the confirmed semantics:
 - **Scope (Q-2):** tokenize `article.Title + " " + article.Summary`.
 - **Tokenization (Q-7):** split on word boundaries, lower-case → set of word tokens.
 - **Match (Q-1, OR):** `true` if **any** `alert.Keyword.Normalized` equals a token
-  (whole-word, case-insensitive). Multi-word keywords match as an ordered token
-  subsequence.
+  (whole-word, case-insensitive).
+- **MVP keyword = a single token (RF-003-C):** keywords contain no internal
+  whitespace; multi-word **phrase** matching (contiguous, e.g. "interest rate") is
+  **out of scope** for the MVP (the requirements defined only single-token whole-word,
+  Q-7). Validation rejects spaces in a keyword. If phrases are needed later, define
+  them as *contiguous* token sequences — never a non-contiguous subsequence.
 - **Purity:** no DB, no clock, no network — fully unit-testable (AC-2, AD-7).
 
 ### 5.2 `EvaluateMatches(article, activeAlerts) : IEnumerable<Match>`
 
 For one article, returns the alerts it matches. The application layer turns each
-`Match` into a `Notification` + `OutboxEntry` (idempotently, honoring N1).
+`Match` into a `Notification` + `OutboxEntry` (idempotently, honoring N1) **and sets
+the article's `EvaluatedAt` in the same transaction** (A3).
+
+- **Restartable driver (RF-003-B):** `EvaluateAlerts` is driven by a **query over
+  un-evaluated articles** (`EvaluatedAt = null`), not solely by the in-process
+  `ArticleIngested` event. The event is an optimization (evaluate promptly); the
+  watermark is the guarantee (nothing is lost if the event/handler is dropped on a
+  crash). This keeps the *ingest→match* seam restart-idempotent, the same way the
+  Outbox keeps *match→deliver* durable.
+- **Scope — no back-matching (RF-003-F):** matching applies to articles ingested
+  *after* an alert becomes active (FR-5 = "each **new** article"). Creating a new
+  alert does **not** retroactively match already-ingested articles.
 
 ---
 
@@ -228,14 +251,16 @@ Article (1) ────────────────────┤
 
 | Event | Raised by | Carries | Consumed by | Transport |
 |-------|-----------|---------|-------------|-----------|
-| `ArticleIngested` | Ingestion | ArticleId (+ refs) | Alerts (evaluate) | MediatR in-process (crash-tolerant fan-out) |
+| `ArticleIngested` | Ingestion | ArticleId (+ refs) | Alerts (evaluate) | MediatR in-process — a *prompt-evaluation nudge*; the durable trigger is the `EvaluatedAt` watermark query (§5.2, RF-003-B) |
 | `ArticleMatched` | Alerts | AlertId, ArticleId, Channel | Notifications (enqueue) | leads into the **durable txn**, not the trigger |
 | `NotificationEnqueued` | Notifications | NotificationId | (observability/log) | MediatR (best-effort) |
 
-> **Durability boundary (M-4):** the actual **delivery** of a Notification is driven
-> by the **Outbox dispatcher** (a timer leasing OutboxEntries), **never** by a
-> MediatR event. MediatR coordinates *in-process orchestration*; the Outbox
-> guarantees *at-least-once delivery* across crashes (NFR-2, R-6).
+> **Durability boundaries:** neither crash-sensitive handoff relies on a MediatR
+> event for its guarantee. *ingest→match* is made restartable by the article
+> `EvaluatedAt` watermark (§5.2, RF-003-B); *match→deliver* is made at-least-once by
+> the **Outbox dispatcher** (M-4) — a timer leasing OutboxEntries, **never** a MediatR
+> event. MediatR only coordinates *in-process orchestration*; the durable state
+> (watermark, outbox) is what survives a crash (NFR-2, R-6).
 
 ---
 
