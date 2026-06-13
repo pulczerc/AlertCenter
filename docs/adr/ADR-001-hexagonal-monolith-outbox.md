@@ -1,19 +1,17 @@
-# Architecture Decision
+# ADR-001 — Hexagonal modular monolith with a DB Outbox
 
 > **Author:** Solution Architect (AI-assisted)
 > **Date:** 2026-06-12 · **Revised:** 2026-06-13 (human steering)
-> **Status:** ✅ **Accepted** — architecture style and all sub-decisions (Q-8…Q-11) ratified by human, 2026-06-13 (Step 3 complete)
-> **Amended by:** [`ADR-002`](adr/ADR-002-architect-review.md) — inter-module communication (Accepted 2026-06-13). See *Inter-module communication* below.
-> **Relates to:** [`02-architecture-options.md`](02-architecture-options.md), [`01-requirements-analysis.md`](01-requirements-analysis.md), prompt trail [`002-architecture.md`](prompts/002-architecture.md)
+> **Status:** ✅ **Accepted** — architecture style and all sub-decisions (Q-8…Q-11) ratified by human, 2026-06-13 (Step 3 complete). Validated as V-002.
+> **Amended by:** [`ADR-002`](ADR-002-architect-review.md) — inter-module communication (Accepted 2026-06-13).
+> **Relates to:** [`02-architecture-options.md`](../02-architecture-options.md), [`01-requirements-analysis.md`](../01-requirements-analysis.md), prompt trail [`002-architecture.md`](../prompts/002-architecture.md), narrative decision doc [`03-architecture-decision.md`](../03-architecture-decision.md).
 
 Per the mandatory process, this ADR being *Accepted* with Q-8…Q-11 confirmed
 satisfies the Agent Invocation Rule precondition for Step 7 (Implementation).
 
 ---
 
-## ADR-001 — Hexagonal modular monolith with a DB Outbox
-
-### Context
+## Context
 
 AlertCenter polls RSS feeds, matches articles to per-user keyword alerts, and
 delivers notifications via Email and Slack. Behaviour is fixed by Q-1…Q-7 (OR
@@ -33,7 +31,7 @@ persistence) behind **ports**, and asynchronous delivery via an **outbox**
 **maintainability/testability (AD-7)** to a top driver, after which weighted
 scoring put **Option B at 46**, ahead of C (41) and A (38).
 
-### Decision
+## Decision
 
 Adopt **Option B — a Hexagonal (Ports & Adapters) modular monolith with a DB
 Outbox**, a single deployable, structured as:
@@ -61,7 +59,7 @@ Outbox**, a single deployable, structured as:
    the application use cases); a separate single-page frontend consumes it for the
    Users / Alerts / Notifications admin surface (FR-11…13).
 
-### Alternatives considered
+## Alternatives considered
 
 - **Option A — synchronous layered monolith (domain coupled to infra).**
   Rejected by the human: lowest code but entangles domain with ORM/HTTP/RSS,
@@ -71,7 +69,10 @@ Outbox**, a single deployable, structured as:
   violate AD-1/AD-6. The chosen outbox preserves the *option* to evolve toward a
   broker later without paying for it now.
 
-### Consequences
+(Full options analysis and the weighted comparison matrix live in
+[`02-architecture-options.md`](../02-architecture-options.md).)
+
+## Consequences
 
 **Positive**
 - Domain and use cases are testable in isolation against fake adapters → directly
@@ -98,7 +99,7 @@ Outbox**, a single deployable, structured as:
 - Single process for the backend is a single point of failure — accepted at demo
   scale (A-1).
 
-### Timebox contingency (R-1)
+## Timebox contingency (R-1)
 
 The clean architecture is the target, but a **running demo outranks completeness**
 within the 3–4h box. If implementation runs long, cut in this order — each cut
@@ -119,7 +120,7 @@ design is intact even when an adapter is downgraded:
 Cut from the top; stop as soon as the box is met. None of these change the domain
 or the port contracts, so they are reversible after the timebox.
 
-### Sub-decisions — ratified by human (Step 3, 2026-06-13)
+## Sub-decisions — ratified by human (Step 3, 2026-06-13)
 
 | # | Question | Decision |
 |---|----------|----------|
@@ -128,9 +129,9 @@ or the port contracts, so they are reversible after the timebox.
 | **Q-10** | Admin UI | ✅ **SPA + JSON API** |
 | **Q-11** | Datastore | ✅ **PostgreSQL** |
 
-### Inter-module communication (added by ADR-002)
+## Inter-module communication (added by ADR-002)
 
-[`ADR-002`](adr/ADR-002-architect-review.md) refines the *horizontal* module
+[`ADR-002`](ADR-002-architect-review.md) refines the *horizontal* module
 boundaries this ADR left implicit. Binding rules:
 
 - **Modules** (each its own hexagon): **Ingestion**, **Alerts** (owns `User`,
@@ -150,11 +151,11 @@ boundaries this ADR left implicit. Binding rules:
 - MediatR is **recommended, not load-bearing** — a Timebox-contingency candidate
   (collapse to direct in-process calls if time is short).
 
-### Gate
+## Gate
 
 > ✅ ADR-001 *Accepted* and Q-8…Q-11 confirmed → the Agent Invocation Rule
 > precondition for Implementation (Step 7) is satisfied. **Next mandatory step:
-> API Design** ([`04-api-design.md`](04-api-design.md)), whose JSON contracts will
+> API Design** ([`04-api-design.md`](../04-api-design.md)), whose JSON contracts will
 > mirror the application use cases and ports above; then DB Design
-> ([`05-db-design.md`](05-db-design.md)) and UI Design
-> ([`06-ui-design.md`](06-ui-design.md)) before any code.
+> ([`05-db-design.md`](../05-db-design.md)) and UI Design
+> ([`06-ui-design.md`](../06-ui-design.md)) before any code.

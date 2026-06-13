@@ -36,7 +36,7 @@
   - `docs/validation-log.md` — V-001 logged.
 - **Committed:** `c1ea376` — `docs(analysis): add product requirements analysis and confirmed decisions`.
 - **Step 2 — Architecture Alternatives** & **Step 3 — Human Decision** complete and human-validated.
-  - `docs/02-architecture-options.md` — drivers (incl. AD-7 maintainability), Hexagonal component decomposition, Options A/B/C, re-scored matrix (B 41).
+  - `docs/02-architecture-options.md` — drivers (incl. AD-7 maintainability), Hexagonal component decomposition, Options A/B/C, re-scored matrix (B 46, C 41, A 38).
   - `docs/03-architecture-decision.md` — **ADR-001 (Accepted):** Hexagonal modular monolith + DB Outbox.
   - `docs/prompts/002-architecture.md` — 2-iteration prompt trail (incl. human steering, verbatim), marked Accepted.
   - `docs/decision-log.md` — D-003 (validated). `docs/validation-log.md` — V-002 logged.
