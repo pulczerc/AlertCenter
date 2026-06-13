@@ -102,6 +102,12 @@ Driven (outbound) ports — the **only** way the core touches the outside world 
 - **Inbound:** Scheduler adapter (timers driving Poll & Dispatch), Admin UI / HTTP controllers.
 - **Outbound:** RSS adapter, Persistence adapter (repositories + Outbox table) , Email sender (**mock default**), Slack sender (**mock default**). Real senders are drop-in and read creds from env config only (NFR-4, AC-5).
 
+> **Module decomposition (ADR-002):** within this hexagon the horizontal modules are
+> **Ingestion**, **Alerts**, **Notifications** (owns the Outbox), and **Channels**
+> (adapters). Inter-module rules — public ports / Shared Kernel only, MediatR for
+> crash-tolerant fan-out, Outbox for the durable delivery handoff — are specified in
+> [`ADR-002`](adr/ADR-002-architect-review.md).
+
 ---
 
 ## 3. Options

@@ -5,7 +5,40 @@
 
 ---
 
-## RF-001 — Step 3: ADR-001 (Architecture Decision)
+## RF-002 — Independent architect review: inter-module communication
+
+> **Date:** 2026-06-13 · **Reviewer of record:** external architect · **Evaluated by:** Solution Architect (AI-assisted)
+> **Subject:** proposal that modules communicate exclusively via MediatR in-process domain events.
+> **Outcome:** ✅ **Ratified** → [`adr/ADR-002-architect-review.md`](adr/ADR-002-architect-review.md) Accepted by human 2026-06-13 (D-005, V-003). 4 accepted, 2 partial, 2 rejected. Pointers applied to `03`/`02`.
+
+### Evaluation vs. ADR-001
+
+| # | Recommendation | Disposition | Note |
+|---|----------------|-------------|------|
+| 1 | No cross-module internal refs; Shared Kernel + public ports only | ✅ Accepted | Best contribution; fills an ADR-001 gap (M-2) |
+| 2 | API calls ports directly; MediatR module↔module only | ✅ Accepted | Idiomatic hexagonal (M-5) |
+| 3 | Synchronous cross-module query via public port | ✅ Accepted | Renamed `ISubscriptionQuery` → `IAlertQuery` (M-3) |
+| 4 | Explicit named module decomposition | ✅ Accepted | Names reconciled to domain (M-1) |
+| 5 | MediatR as the in-process module bus | 🟡 Partial | OK for crash-tolerant fan-out; **not** the durable delivery handoff (M-4) |
+| 6 | MediatR → broker migration path | 🟡 Partial | True, but the **Outbox** is the primary broker seam; MediatR is secondary |
+| 7 | Modules communicate **exclusively** via MediatR fire-and-forget | ❌ Rejected | **Collides with the DB Outbox**; non-durable for delivery → voids NFR-2/AD-4/R-6. Also self-contradicts #3 |
+| 8 | Event names `AlertCreated` / `AlertDispatched` | ❌ Rejected | Corrupts ubiquitous language: Alert = a *rule* (FR-4), a match yields a *Notification*. Use `ArticleIngested` / `ArticleMatched` / `NotificationEnqueued` (M-6) |
+
+### Central finding (🔴)
+**RF-002-A — "exclusive MediatR" undermines the chosen durability model.** ADR-001
+deliberately puts the match→delivery handoff on a **DB Outbox** (one-transaction
+enqueue, timer-leased dispatch) for at-least-once delivery and restart-idempotency.
+MediatR `Publish` is in-memory and non-durable; routing the delivery handoff through
+it would silently drop notifications on a crash between publish and handler.
+**Resolution:** MediatR is admitted as an in-process orchestration bus for
+crash-tolerant steps **only**; the delivery boundary stays on the Outbox (ADR-002 M-4).
+
+### Decision
+Synthesized into **ADR-002 (Proposed)**. No ADR-001 guarantee is given up; the review's
+isolation/boundary rules are adopted; "exclusive MediatR" and the event naming are
+rejected. **No document or code is amended until the human ratifies ADR-002.**
+
+
 
 > **Date:** 2026-06-13 · **Reviewer:** Principal Engineer (AI-assisted, `reviewer` agent)
 > **Artifacts:** [`03-architecture-decision.md`](03-architecture-decision.md), cross-checked vs [`02-architecture-options.md`](02-architecture-options.md), [`01-requirements-analysis.md`](01-requirements-analysis.md)

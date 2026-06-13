@@ -3,6 +3,7 @@
 > **Author:** Solution Architect (AI-assisted)
 > **Date:** 2026-06-12 · **Revised:** 2026-06-13 (human steering)
 > **Status:** ✅ **Accepted** — architecture style and all sub-decisions (Q-8…Q-11) ratified by human, 2026-06-13 (Step 3 complete)
+> **Amended by:** [`ADR-002`](adr/ADR-002-architect-review.md) — inter-module communication (Accepted 2026-06-13). See *Inter-module communication* below.
 > **Relates to:** [`02-architecture-options.md`](02-architecture-options.md), [`01-requirements-analysis.md`](01-requirements-analysis.md), prompt trail [`002-architecture.md`](prompts/002-architecture.md)
 
 Per the mandatory process, this ADR being *Accepted* with Q-8…Q-11 confirmed
@@ -126,6 +127,28 @@ or the port contracts, so they are reversible after the timebox.
 | **Q-8** | Implementation stack | ✅ **.NET 8** (ASP.NET Core Web API + EF Core / Npgsql) |
 | **Q-10** | Admin UI | ✅ **SPA + JSON API** |
 | **Q-11** | Datastore | ✅ **PostgreSQL** |
+
+### Inter-module communication (added by ADR-002)
+
+[`ADR-002`](adr/ADR-002-architect-review.md) refines the *horizontal* module
+boundaries this ADR left implicit. Binding rules:
+
+- **Modules** (each its own hexagon): **Ingestion**, **Alerts** (owns `User`,
+  `Alert`, matching, `IAlertQuery`), **Notifications** (owns the Outbox + dispatch),
+  **Channels** (`INotificationChannel` adapters).
+- **Isolation (M-2):** no module references another's internals — only the **Shared
+  Kernel** or a module's **public port** crosses a boundary.
+- **Two channels (M-3):** synchronous **port queries** (e.g. `IAlertQuery`) for reads;
+  **MediatR in-process events** for crash-tolerant module fan-out only.
+- **Durability boundary (M-4):** the **match → notification → delivery** handoff stays
+  on the **DB Outbox**, never a MediatR event (MediatR is non-durable). MediatR
+  *coexists with*, does not replace, the Outbox.
+- **API (M-5):** inbound adapters call ports directly; MediatR is module↔module only.
+- **Naming (M-6):** events are `ArticleIngested` / `ArticleMatched` /
+  `NotificationEnqueued` — *not* `AlertCreated`/`AlertDispatched` (an Alert is a rule,
+  a match yields a Notification).
+- MediatR is **recommended, not load-bearing** — a Timebox-contingency candidate
+  (collapse to direct in-process calls if time is short).
 
 ### Gate
 

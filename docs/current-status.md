@@ -41,6 +41,13 @@
   - `docs/prompts/002-architecture.md` — 2-iteration prompt trail (incl. human steering, verbatim), marked Accepted.
   - `docs/decision-log.md` — D-003 (validated). `docs/validation-log.md` — V-002 logged.
 - **Committed:** `4350bb2` — `docs(architecture): adopt hexagonal monolith + DB outbox (ADR-001)`.
+- **Architecture amendment — ADR-002 (Accepted 2026-06-13):** evaluated an independent
+  architect review (RF-002) on inter-module communication. Adopted explicit module
+  boundaries + MediatR (crash-tolerant fan-out only); **kept the DB Outbox as the
+  durable delivery boundary** (rejected "exclusive MediatR"). `decision-log.md` — D-005;
+  `validation-log.md` — V-003.
+
+> **Binding architecture baseline = ADR-001 + ADR-002.** Both constrain Step 4 onward.
 
 ---
 
